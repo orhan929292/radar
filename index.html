@@ -1,0 +1,1071 @@
+<!doctype html>
+<html lang="en" data-ax-route="dashboards/area-radar" data-cr-shell="topbar" data-cr-title>
+<head><meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
+<!-- ============================================================ -->
+<!-- VIREO ANTI-FLASH THEME RESTORE — MUST be first executable    -->
+<!-- in <head>, before any stylesheet. Runs synchronously (~1ms), -->
+<!-- reads ax: localStorage, resolves system theme via matchMedia,-->
+<!-- and writes all data-ax-* + dir + lang on <html> before paint.-->
+<!-- Framework-agnostic IIFE; try/catch so storage never blocks.  -->
+<!-- ============================================================ -->
+<script>
+/* Vireo anti-flash — must be FIRST in <head>, before stylesheets. */
+(function () {
+  var D = document.documentElement, LS;
+  try { LS = window.localStorage; } catch (e) { LS = null; }
+  function get(k){ try { return LS && LS.getItem(k); } catch(e){ return null; } }
+
+  /* schema guard: wipe unknown shape, never throw */
+  try { if (LS && get('ax:schema') && get('ax:schema') !== '1') {
+    Object.keys(LS).forEach(function(k){ if (k.indexOf('ax:')===0) LS.removeItem(k); });
+  } if (LS) LS.setItem('ax:schema','1'); } catch(e){}
+
+  /* ---- THEME (light | dark | system) ---- */
+  var theme = get('ax:theme') || 'system';
+  var sysDark = false;
+  try { sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches; } catch(e){}
+  var resolved = (theme === 'system') ? (sysDark ? 'dark' : 'light') : theme;
+  D.setAttribute('data-ax-theme', resolved);  /* always written so CSS [data-ax-theme] selectors match */
+
+  /* ---- ACCENT ---- */
+  var accent = get('ax:accent') || 'verdigris';
+  if (accent === 'verdigris') D.removeAttribute('data-ax-accent');
+  else D.setAttribute('data-ax-accent', accent);
+
+  /* ---- FONT (any Google family; the default, Inter, needs no attr + no link) ----
+     Mirrors js/core/fonts.js. Injected here rather than after boot so the face
+     is already in flight when the first paint happens — otherwise every page
+     load would flash Inter before swapping. A family chosen in the customizer
+     rides an INLINE --ax-font-sans, exactly as the custom accent colour does;
+     its weight ramp was resolved from the Google Fonts catalog at pick time and
+     persisted, because this script must rebuild the same URL without being able
+     to load that catalog. */
+  var fontFamily = (get('ax:font') === 'custom') ? get('ax:font-custom') : null;
+  if (fontFamily) {
+    D.setAttribute('data-ax-font', 'custom');
+    D.style.setProperty('--ax-font-sans', '"' + fontFamily + '", ui-sans-serif, system-ui, sans-serif');
+    var fl = document.createElement('link');
+    fl.id = 'ax-font-link'; fl.rel = 'stylesheet';
+    fl.href = 'https://fonts.googleapis.com/css2?family=' + fontFamily.replace(/ /g, '+') +
+              (get('ax:font-weights') || ':wght@400;500;600;700') + '&display=swap';
+    document.head.appendChild(fl);
+  } else { D.removeAttribute('data-ax-font'); }
+
+  /* ---- LANG + DIR ---- */
+  var lang = (get('ax:lang') || 'EN').toUpperCase();
+  D.setAttribute('lang', lang.toLowerCase());                 /* EN -> en */
+  var dirStored = get('ax:dir');                              /* explicit wins */
+  var dir = dirStored ? dirStored : (lang === 'AR' ? 'rtl' : 'ltr');
+  D.setAttribute('dir', dir);
+
+  /* ---- LAYOUT / SCHEME attributes (write only non-defaults; keep DOM clean) ---- */
+  function setAttr(attr, key, def){
+    var v = get(key);
+    if (v && v !== def) D.setAttribute(attr, v); else D.removeAttribute(attr);
+  }
+  setAttr('data-ax-nav',              'ax:nav',              'vertical');
+  setAttr('data-ax-shell-style',      'ax:shell-style',      'default');
+  setAttr('data-ax-sidebar-behavior', 'ax:sidebar-behavior', 'collapsible');
+  setAttr('data-ax-menu',             'ax:menu',             'click');
+  setAttr('data-ax-page',             'ax:page',             'regular');
+  setAttr('data-ax-width',            'ax:width',            'fluid');
+  setAttr('data-ax-header-position',  'ax:header-position',  'fixed');
+  setAttr('data-ax-sidebar-position', 'ax:sidebar-position', 'fixed');
+  setAttr('data-ax-sidebar',          'ax:sidebar-scheme',   'light');
+  setAttr('data-ax-header',           'ax:header-scheme',    'light');
+  setAttr('data-ax-sidebar-image',    'ax:sidebar-image',    'none');
+  setAttr('data-ax-loader',           'ax:loader',           'on');
+
+  /* ---- COLLAPSED RAIL (header toggle; boolean presence, default expanded) ----
+     Only honoured in the 'collapsible' behavior. 'expanded'/'compact' lock the
+     rail (compact renders the icon rail via [data-ax-sidebar-behavior]), so the
+     persisted toggle must not re-collapse over them. */
+  var behavior = get('ax:sidebar-behavior') || 'collapsible';
+  if (behavior === 'collapsible' && get('ax:collapsed') === '1') D.setAttribute('data-ax-collapsed', '');
+  else D.removeAttribute('data-ax-collapsed');
+
+  /* ---- CUSTOM COLOR PICKERS (inline style; re-derive ramp deterministically) ---- */
+  var customAccent = get('ax:accent-custom');
+  if (accent === 'custom' && customAccent) {
+    /* full ramp derivation lives in customizer module; head script sets at least
+       --ax-accent + --ax-on-accent so first paint is correct. */
+    D.style.setProperty('--ax-accent', customAccent);
+    /* on-accent by luminance (sRGB approx) */
+    var h = customAccent.replace('#','');
+    var r=parseInt(h.substr(0,2),16),g=parseInt(h.substr(2,2),16),b=parseInt(h.substr(4,2),16);
+    var L = (0.2126*r + 0.7152*g + 0.0722*b)/255;
+    D.style.setProperty('--ax-on-accent', L > 0.62 ? '#1F1602' : '#FFFFFF');
+    D.setAttribute('data-ax-accent','custom');
+  }
+  var bg = get(resolved === 'dark' ? 'ax:bg-custom-dark' : 'ax:bg-custom');
+  if (bg) D.style.setProperty('--ax-canvas', bg);
+})();
+</script>
+
+<title>Index · Corelain Dashboard</title>
+<meta name="description" content="Corelain Dashboard — UK area radar: property market, risk and neighbourhood insights." />
+<meta name="theme-color" content="#0A0C11" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#FCFBF9" media="(prefers-color-scheme: light)" />
+<link rel="icon" type="image/png" href="/favicon.png" />
+
+<!-- Google Fonts — Inter (sans) · Space Grotesk (display) · JetBrains Mono (mono) · token brief §7.1 -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@500;600&display=swap"
+  rel="stylesheet"
+/>
+
+<!-- Compiled application stylesheet (token chain + Tailwind v4 @theme bridge + shell/components) -->
+  <script type="module" crossorigin src="/assets/index-oIICQXBW.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-GpJCzvqO.css">
+</head>
+<body>
+  <!-- Page preloader — full-screen overlay removed on boot by vireo.js hideLoader().
+       The customizer "Page loader" toggle writes data-ax-loader="off" to suppress it
+       ([data-ax-loader='off'] .ax-loader { display:none }). Reuses the existing
+       .ax-spinner component; no bespoke loader CSS. -->
+  <div class="ax-loader" data-ax-loader-el role="status" aria-live="polite" aria-label="Loading">
+    <span class="ax-spinner ax-spinner--lg" aria-hidden="true"><span class="ax-spinner__glyph"></span></span>
+  </div>
+  <div class="ax-ambient" aria-hidden="true"><i></i></div>
+  <div class="ax-layout">
+    <div class="ax-shell">
+      <header class="ax-header" role="banner" x-data="axHeader()">
+        <!-- 1 · SIDEBAR TOGGLE -->
+        <button type="button" class="ax-nav-toggle ax-icon-btn" @click="toggleSidebar()" aria-label="Toggle menu" :aria-expanded="!collapsed">
+          <svg class="ax-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M4 6l16 0" /><path d="M4 12l16 0" /><path d="M4 18l16 0" /></svg>
+        </button>
+      
+        <!-- 1b · BRAND — only shown on top-bar-only pages (html[data-cr-shell="topbar"]) -->
+        <a class="cr-header-brand" href="/" aria-label="Corelain Dashboard home">
+          <img class="cr-header-brand__logo" src="/images/logo.png" alt="Corelain" width="160" height="30">
+        </a>
+      
+        <!-- 2 · COMMAND SEARCH (⌘K trigger) -->
+        <button type="button" class="ax-search" @click="$dispatch('ax-command-open')" aria-haspopup="dialog" aria-controls="ax-command" aria-label="Search or jump to">
+          <svg class="ax-icon ax-search__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" /><path d="M21 21l-6 -6" /></svg>
+          <span class="ax-search__placeholder">Search area or postcode…</span>
+          <kbd class="ax-search__keycap">⌘K</kbd>
+        </button>
+      
+        <span class="ax-header__spacer"></span>
+      
+        <!-- ===== RIGHT UTILITY CLUSTER =====
+             Shared with the full-screen app bar (partials/app-bar.html) so the two
+             chromes can never drift. Items 4–11 + the responsive overflow shed. -->
+          <!-- 4 · LANGUAGE (8) -->
+          <div class="ax-lang" x-data="axDropdown()" @keydown.escape="close()" @click.outside="close()">
+            <button type="button" class="ax-icon-btn ax-lang__trigger" @click="toggle()" aria-haspopup="menu" :aria-expanded="open" aria-controls="ax-lang-menu" aria-label="Change language">
+              <span class="ax-lang__code" x-text="$store.ax ? $store.ax.lang : 'EN'">EN</span>
+            </button>
+            <div id="ax-lang-menu" class="ax-dropdown ax-lang__menu" role="menu" x-show="open" x-transition.opacity.duration.150ms x-cloak>
+              <button type="button" class="ax-dropdown__item is-active" role="menuitemradio" aria-checked="true" @click="setLang('EN'); close()"><span class="ax-lang__code">EN</span><span class="ax-lang__name">English</span><svg class="ax-dropdown__check ax-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M5 12l5 5l10 -10" /></svg></button>
+              <button type="button" class="ax-dropdown__item" role="menuitemradio" aria-checked="false" @click="setLang('ES'); close()"><span class="ax-lang__code">ES</span><span class="ax-lang__name">Español</span></button>
+              <button type="button" class="ax-dropdown__item" role="menuitemradio" aria-checked="false" @click="setLang('FR'); close()"><span class="ax-lang__code">FR</span><span class="ax-lang__name">Français</span></button>
+              <button type="button" class="ax-dropdown__item" role="menuitemradio" aria-checked="false" @click="setLang('AR'); close()"><span class="ax-lang__code">AR</span><span class="ax-lang__name">العربية</span></button>
+              <button type="button" class="ax-dropdown__item" role="menuitemradio" aria-checked="false" @click="setLang('DE'); close()"><span class="ax-lang__code">DE</span><span class="ax-lang__name">Deutsch</span></button>
+              <button type="button" class="ax-dropdown__item" role="menuitemradio" aria-checked="false" @click="setLang('ZH'); close()"><span class="ax-lang__code">ZH</span><span class="ax-lang__name">中文</span></button>
+              <button type="button" class="ax-dropdown__item" role="menuitemradio" aria-checked="false" @click="setLang('IT'); close()"><span class="ax-lang__code">IT</span><span class="ax-lang__name">Italiano</span></button>
+              <button type="button" class="ax-dropdown__item" role="menuitemradio" aria-checked="false" @click="setLang('RU'); close()"><span class="ax-lang__code">RU</span><span class="ax-lang__name">Русский</span></button>
+            </div>
+          </div>
+        
+          <!-- 5 · FULLSCREEN -->
+          <button type="button" class="ax-fullscreen ax-icon-btn" @click="toggleFullscreen()" :aria-pressed="full" aria-label="Toggle fullscreen">
+            <svg class="ax-icon" x-show="!full" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M4 8v-2a2 2 0 0 1 2 -2h2" /><path d="M4 16v2a2 2 0 0 0 2 2h2" /><path d="M16 4h2a2 2 0 0 1 2 2v2" /><path d="M16 20h2a2 2 0 0 0 2 -2v-2" /></svg>
+            <svg class="ax-icon" x-show="full" x-cloak viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M15 19v-2a2 2 0 0 1 2 -2h2" /><path d="M15 5v2a2 2 0 0 0 2 2h2" /><path d="M5 15h2a2 2 0 0 1 2 2v2" /><path d="M5 9h2a2 2 0 0 0 2 -2v-2" /></svg>
+          </button>
+        
+          <!-- 6 · LIGHT/DARK QUICK-TOGGLE -->
+          <button type="button" class="ax-theme-toggle ax-icon-btn" data-ax-toggle="theme" @click="toggleTheme()" :aria-pressed="theme==='dark'" aria-label="Toggle dark mode">
+            <svg class="ax-icon" x-show="theme==='dark'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M8 12a4 4 0 1 0 8 0a4 4 0 1 0 -8 0" /><path d="M3 12h1m8 -9v1m8 8h1m-9 8v1m-6.4 -15.4l.7 .7m12.1 -.7l-.7 .7m0 11.4l.7 .7m-12.1 -.7l-.7 .7" /></svg>
+            <svg class="ax-icon" x-show="theme!=='dark'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454l0 .008" /></svg>
+          </button>
+        
+          <!-- 10 · CORELAIN SITE -->
+          <a class="cr-site-btn" href="https://www.corelain.com/" target="_blank" rel="noopener" aria-label="Visit Corelain (opens in a new tab)">
+            <span class="cr-site-btn__label">Visit Corelain</span>
+            <svg class="ax-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M12 6h-6a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-6" /><path d="M11 13l9 -9" /><path d="M15 4h5v5" /></svg>
+          </a>
+        
+          <!-- OVERFLOW (mobile / tablet shed) -->
+          <div class="ax-overflow" x-data="axDropdown()" x-show="$store.ax && $store.ax.overflow && $store.ax.overflow.length" @keydown.escape="close()" @click.outside="close()" x-cloak>
+            <button type="button" class="ax-icon-btn ax-overflow__trigger" @click="toggle()" aria-haspopup="menu" :aria-expanded="open" aria-controls="ax-overflow-menu" aria-label="More">
+              <svg class="ax-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M11 19a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /><path d="M11 5a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" /></svg>
+            </button>
+            <!-- The shed rows are STATIC (not JS-injected): they live inside the
+                 x-data="axHeader()" root, so `setLang` / `toggleFullscreen` / `full`
+                 resolve up the Alpine scope chain exactly like the header copies do.
+                 Every row carries data-ax-shed="<key>" and is revealed by the SAME
+                 breakpoint that hides its header trigger (shell.css §9 RESPONSIVE) —
+                 so exactly one copy of each control is ever interactive. Keep the two
+                 in sync: the keys mirror _bindBands() in js/alpine/index.js. -->
+            <div id="ax-overflow-menu" class="ax-dropdown ax-overflow__menu" role="menu" x-show="open" x-transition.opacity.duration.150ms x-cloak>
+              <!-- LANGUAGE (shed < lg) — the 8 codes as chips; the full names stay in
+                   the wide-viewport menu where there is room for them. -->
+              <div class="ax-overflow__group" data-ax-shed="lang" role="presentation">
+                <p class="ax-dropdown__head">Language</p>
+                <div class="ax-overflow__langs" role="group" aria-label="Change language">
+                  <button type="button" class="ax-overflow__lang ax-lang__code" :class="{ 'is-active': $store.ax.lang === 'EN' }" @click="setLang('EN'); close()">EN</button>
+                  <button type="button" class="ax-overflow__lang ax-lang__code" :class="{ 'is-active': $store.ax.lang === 'ES' }" @click="setLang('ES'); close()">ES</button>
+                  <button type="button" class="ax-overflow__lang ax-lang__code" :class="{ 'is-active': $store.ax.lang === 'FR' }" @click="setLang('FR'); close()">FR</button>
+                  <button type="button" class="ax-overflow__lang ax-lang__code" :class="{ 'is-active': $store.ax.lang === 'AR' }" @click="setLang('AR'); close()">AR</button>
+                  <button type="button" class="ax-overflow__lang ax-lang__code" :class="{ 'is-active': $store.ax.lang === 'DE' }" @click="setLang('DE'); close()">DE</button>
+                  <button type="button" class="ax-overflow__lang ax-lang__code" :class="{ 'is-active': $store.ax.lang === 'ZH' }" @click="setLang('ZH'); close()">ZH</button>
+                  <button type="button" class="ax-overflow__lang ax-lang__code" :class="{ 'is-active': $store.ax.lang === 'IT' }" @click="setLang('IT'); close()">IT</button>
+                  <button type="button" class="ax-overflow__lang ax-lang__code" :class="{ 'is-active': $store.ax.lang === 'RU' }" @click="setLang('RU'); close()">RU</button>
+                </div>
+              </div>
+        
+              <!-- FULLSCREEN (shed < lg) -->
+              <button type="button" class="ax-dropdown__item" role="menuitem" data-ax-shed="fullscreen" @click="toggleFullscreen(); close()">
+                <svg class="ax-icon ax-dropdown__lead" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M4 8v-2a2 2 0 0 1 2 -2h2" /><path d="M4 16v2a2 2 0 0 0 2 2h2" /><path d="M16 4h2a2 2 0 0 1 2 2v2" /><path d="M16 20h2a2 2 0 0 0 2 -2v-2" /></svg>
+                <span x-text="full ? 'Exit fullscreen' : 'Fullscreen'">Fullscreen</span>
+              </button>
+        
+            </div>
+          </div>
+      </header>
+      <main class="ax-main" id="ax-main">
+        <!-- ════════════════ COVER HERO (full-bleed, under the header) ════════════════ -->
+        <section class="cr-hero" role="region" aria-label="Area overview">
+          <img class="cr-hero__img" src="/images/banner-manchester.jpg" alt="" aria-hidden="true">
+          <div class="cr-hero__inner">
+            <nav class="ax-breadcrumb cr-hero__crumbs" data-cr-static aria-label="Breadcrumb">
+              <ol class="ax-breadcrumb__list" data-cr-crumbs>
+                <li class="ax-breadcrumb__item"><span>UK</span></li>
+                <li class="ax-breadcrumb__sep" aria-hidden="true"><svg class="ax-icon ax-icon--directional" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6l-6 6"/></svg></li>
+                <li class="ax-breadcrumb__item"><span>Manchester</span></li>
+                <li class="ax-breadcrumb__sep" aria-hidden="true"><svg class="ax-icon ax-icon--directional" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6l-6 6"/></svg></li>
+                <li class="ax-breadcrumb__item"><span>Trafford</span></li>
+                <li class="ax-breadcrumb__sep" aria-hidden="true"><svg class="ax-icon ax-icon--directional" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6l-6 6"/></svg></li>
+                <li class="ax-breadcrumb__item" aria-current="page"><span>Old Trafford</span></li>
+              </ol>
+            </nav>
+            <div class="cr-hero__body">
+              <span class="cr-hero__eyebrow">Area stats</span>
+              <h1 class="cr-hero__title" data-cr-area-name>Old Trafford</h1>
+              <p class="cr-hero__subtitle">Property Prices, Crime Rates, Area &amp; Demographic Insights · <span data-cr-area-place>M16, Trafford, Greater Manchester</span></p>
+              <div class="cr-hero__bar" x-data="crHeroActions()">
+                <!-- ── postcode search · compare ── -->
+                <div class="cr-hero__actions">
+                  <form class="cr-hero__search" role="search" @submit.prevent="search()">
+                    <label class="ax-visually-hidden" for="cr-postcode">Search area or postcode</label>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"/><path d="M21 21l-6 -6"/></svg>
+                    <input id="cr-postcode" type="search" list="cr-area-options" placeholder="Area or postcode" autocomplete="off" x-model="query" enterkeyhint="search">
+                    <datalist id="cr-area-options">
+                      <template x-for="a in areas" :key="a.id"><option :value="a.name" x-text="a.postcode"></option></template>
+                    </datalist>
+                  </form>
+                  <button type="button" class="cr-hero__cta cr-hero__cta--ghost" @click="compareOpen = true" aria-haspopup="dialog">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 18a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M15 6a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"/><path d="M7 16v-11h6"/><path d="M17 8v11h-6"/><path d="M10 2l3 3l-3 3"/><path d="M14 16l-3 3l3 3"/></svg>
+                    <span>Compare</span>
+                  </button>
+                </div>
+
+                <!-- ── COMPARE modal (template modal, lg) ── -->
+                <template x-teleport="body">
+                  <div class="ax-modal ax-modal--centered" x-show="compareOpen" x-cloak @keydown.escape.window="compareOpen = false" role="dialog" aria-modal="true" aria-labelledby="cr-compare-title">
+                    <div class="ax-modal__backdrop" x-show="compareOpen" x-transition.opacity @click="compareOpen = false"></div>
+                    <div class="ax-modal__dialog ax-modal__dialog--lg" x-show="compareOpen" x-transition x-trap.inert.noscroll="compareOpen">
+                      <div class="ax-modal__header">
+                        <h2 class="ax-modal__title" id="cr-compare-title">Compare areas</h2>
+                        <button type="button" class="ax-modal__close" @click="compareOpen = false" aria-label="Close compare"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg></button>
+                      </div>
+                      <div class="ax-modal__body">
+                        <div class="cr-compare__pick">
+                          <div class="cr-compare__fixed"><span class="cr-compare__label">This area</span><b x-text="areaName"></b></div>
+                          <span class="cr-compare__vs" aria-hidden="true">vs</span>
+                          <div style="flex:1;">
+                            <label class="cr-compare__label" for="cr-compare-select">Compare with</label>
+                            <select id="cr-compare-select" class="ax-input" x-model="compareId">
+                              <template x-for="a in areas.filter(a => a.id !== areaId)" :key="a.id">
+                                <option :value="a.id" x-text="`${a.name} · ${a.postcode}`"></option>
+                              </template>
+                            </select>
+                          </div>
+                        </div>
+                        <div class="ax-table-wrap">
+                          <table class="ax-table">
+                            <thead class="ax-table__head"><tr>
+                              <th class="ax-table__th" scope="col">Metric</th>
+                              <th class="ax-table__th ax-table__th--num" scope="col" x-text="areaName"></th>
+                              <th class="ax-table__th ax-table__th--num" scope="col" x-text="compareArea && compareArea.name"></th>
+                            </tr></thead>
+                            <tbody>
+                              <template x-for="row in compareRows" :key="row.label">
+                                <tr class="ax-table__row">
+                                  <td class="ax-table__td" x-text="row.label"></td>
+                                  <td class="ax-table__td ax-table__td--num" :class="{ 'cr-win': row.win === 'a' }" x-text="row.a"></td>
+                                  <td class="ax-table__td ax-table__td--num" :class="{ 'cr-win': row.win === 'b' }" x-text="row.b"></td>
+                                </tr>
+                              </template>
+                            </tbody>
+                          </table>
+                        </div>
+                        <p style="margin:var(--ax-space-3) 0 0;font-size:var(--ax-text-xs);color:var(--ax-text-subtle);">Highlighted = better value. Old Trafford figures are real; other areas are sample data.</p>
+                      </div>
+                      <div class="ax-modal__footer">
+                        <button type="button" class="ax-btn ax-btn--ghost" @click="compareOpen = false">Close</button>
+                        <a class="ax-btn ax-btn--primary" :href="compareArea ? compareHref : '#'">Open <span x-text="compareArea && compareArea.name"></span></a>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ════════════════ DASHBOARD GRID ════════════════ -->
+        <div class="ax-dash-grid"
+          x-data="{
+            q: '',
+            activeId: 'loc-1',
+            mapType: 'map',
+            places: [
+              { id:'loc-1', name:'Old Trafford Stadium', addr:'Sir Matt Busby Way, Old Trafford M16 0RA', type:'Stadium', open:true, dist:'0.3 mi', c:'--ax-accent', ll:'53.4631,-2.2913' },
+              { id:'loc-2', name:'Old Trafford Metrolink', addr:'Warwick Rd, Old Trafford, Manchester', type:'Tram stop', open:true, dist:'0.5 mi', c:'--ax-viz-violet', ll:'53.4568,-2.2848' },
+              { id:'loc-3', name:'Emirates Old Trafford', addr:'Talbot Rd, Old Trafford M16 0PX', type:'Cricket ground', open:true, dist:'0.6 mi', c:'--ax-viz-pink', ll:'53.4563,-2.2873' },
+              { id:'loc-4', name:'IWM North', addr:'Trafford Wharf Rd, Salford Quays M17 1TZ', type:'Museum', open:true, dist:'0.9 mi', c:'--ax-viz-amber', ll:'53.4697,-2.2995' },
+              { id:'loc-5', name:'Longford Park', addr:'Edge Ln, Stretford, Manchester', type:'Park', open:true, dist:'1.6 mi', c:'--ax-viz-emerald', ll:'53.4440,-2.2940' },
+              { id:'loc-6', name:'Trafford Centre', addr:'Trafford Centre, Manchester M17 8AA', type:'Shopping centre', open:false, dist:'2.7 mi', c:'--ax-viz-cyan', ll:'53.4667,-2.3480' }
+            ],
+            get filtered(){ const t=this.q.trim().toLowerCase(); return t ? this.places.filter(p=>(p.name+' '+p.addr+' '+p.type).toLowerCase().includes(t)) : this.places; },
+            get active(){ return this.places.find(p => p.id === this.activeId) || this.places[0]; },
+            get embedSrc(){ const t = this.mapType==='satellite' ? '&t=k' : this.mapType==='terrain' ? '&t=p' : ''; return `https://www.google.com/maps?q=${this.active.ll}&z=15&hl=en&output=embed${t}`; }
+          }">
+
+          <!-- ───── MAP CANVAS (hero) ───── -->
+          <section class="ax-card ax-card--chart ax-col--8" role="region" aria-label="Map of nearby locations in Old Trafford" style="overflow:hidden;">
+            <div class="ax-card__header">
+              <div class="ax-card__titles">
+                <span class="ax-card__eyebrow">Live map</span>
+                <h2 class="ax-card__title" data-cr-area-label>Old Trafford, M16</h2>
+                <p class="ax-card__subtitle">Selected area · nearby amenities within 1.5 mi</p>
+              </div>
+              <div class="ax-card__actions">
+                <div class="ax-segment" role="group" aria-label="Map type">
+                  <button type="button" class="ax-segment__option" :class="{ 'is-active': mapType==='map' }" :aria-pressed="mapType==='map'" @click="mapType='map'">Map</button>
+                  <button type="button" class="ax-segment__option" :class="{ 'is-active': mapType==='satellite' }" :aria-pressed="mapType==='satellite'" @click="mapType='satellite'">Satellite</button>
+                  <button type="button" class="ax-segment__option" :class="{ 'is-active': mapType==='terrain' }" :aria-pressed="mapType==='terrain'" @click="mapType='terrain'">Terrain</button>
+                </div>
+              </div>
+            </div>
+            <div class="ax-card__body" style="padding-top:0;">
+              <!-- real Google Maps embed (no API key) — recenters on the active location -->
+              <div aria-label="Google map of nearby locations"
+                   style="position:relative;height:440px;border-radius:var(--ax-radius-lg);overflow:hidden;border:1px solid var(--ax-border);background:var(--ax-surface-subtle);">
+                <iframe :src="embedSrc" title="Google map of nearby locations"
+                        loading="lazy" referrerpolicy="no-referrer-when-downgrade"
+                        style="position:absolute;inset:0;width:100%;height:100%;border:0;"></iframe>
+
+                <!-- floating info panel for the active location (over the map) -->
+                <div x-transition.opacity
+                     style="position:absolute;left:var(--ax-space-4);top:var(--ax-space-4);min-width:240px;max-width:280px;
+                            background:var(--ax-surface-overlay);border:1px solid var(--ax-border);border-radius:var(--ax-radius-md);
+                            box-shadow:var(--ax-shadow-md);padding:var(--ax-space-4);z-index:6;pointer-events:none;">
+                  <div class="ax-cluster" style="gap:var(--ax-space-2);margin-bottom:var(--ax-space-1);flex-wrap:nowrap;">
+                    <span :style="`width:8px;height:8px;border-radius:50%;background:var(${active.c});flex:none;`"></span>
+                    <b style="color:var(--ax-text-strong);font-size:var(--ax-text-sm);" x-text="active.name"></b>
+                  </div>
+                  <p style="margin:0;font-size:var(--ax-text-xs);color:var(--ax-text-muted);" x-text="active.addr"></p>
+                  <div class="ax-cluster" style="gap:var(--ax-space-2);margin-top:var(--ax-space-3);">
+                    <span class="ax-badge ax-badge--soft ax-badge--pill" :class="active.open ? 'ax-badge--success' : 'ax-badge--danger'"><span class="ax-badge__dot"></span><span x-text="active.open ? 'Open now' : 'Closed'"></span></span>
+                    <span class="ax-badge ax-badge--soft ax-badge--pill ax-num" x-text="active.dist"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- ───── LOCATIONS RAIL (search + list) ───── -->
+          <section class="ax-card ax-col--4" role="region" aria-label="Searchable list of nearby locations">
+            <div class="ax-card__header">
+              <div class="ax-card__titles">
+                <h2 class="ax-card__title">Nearby Locations</h2>
+                <p class="ax-card__subtitle"><span class="ax-num" x-text="filtered.length"></span> shown · click to focus the map</p>
+              </div>
+            </div>
+            <div class="ax-card__body" style="padding-top:0;display:flex;flex-direction:column;gap:var(--ax-space-3);">
+              <!-- search -->
+              <div class="ax-field__control">
+                <span class="ax-field__affix ax-field__affix--leading" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0"/><path d="M21 21l-6 -6"/></svg>
+                </span>
+                <input type="search" class="ax-input ax-input--with-leading-icon" placeholder="Search nearby…" aria-label="Search nearby locations" x-model.debounce.150ms="q">
+              </div>
+
+              <!-- list -->
+              <ul class="ax-list ax-list--compact" style="max-height:392px;overflow:auto;">
+                <template x-for="p in filtered" :key="p.id">
+                  <li class="ax-list__row" role="button" tabindex="0"
+                      @click="activeId = p.id" @keydown.enter="activeId = p.id"
+                      :class="{ 'is-selected': activeId === p.id }"
+                      style="cursor:pointer;border-radius:var(--ax-radius-sm);">
+                    <span class="ax-list__leading">
+                      <span class="ax-avatar ax-avatar--sm ax-avatar--squircle" :style="`background:color-mix(in oklab, var(${p.c}) 18%, transparent); color:var(${p.c});`">
+                        <svg class="ax-avatar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" x-html="crPlaceIcons[p.type]"></svg>
+                      </span>
+                    </span>
+                    <span class="ax-list__content" style="min-width:0;">
+                      <span class="ax-list__title ax-truncate" style="font-weight:var(--ax-weight-medium);" x-text="p.name"></span>
+                      <span class="ax-truncate" style="display:block;font-size:var(--ax-text-xs);color:var(--ax-text-subtle);" x-text="p.type + ' · ' + p.addr"></span>
+                    </span>
+                    <span class="ax-list__trailing" style="text-align:end;">
+                      <span class="ax-num" style="display:block;font-size:var(--ax-text-xs);color:var(--ax-text-muted);" x-text="p.dist"></span>
+                      <span :style="`display:inline-block;width:7px;height:7px;border-radius:50%;margin-top:4px;background:var(${p.open ? '--ax-success-500' : '--ax-danger-500'});`"></span>
+                    </span>
+                  </li>
+                </template>
+              </ul>
+            </div>
+          </section>
+
+          <!-- ───── MARKET KPI ROW ─────
+               icon + title · value · change chip + comparison · trend line.
+               Old Trafford figures: HM Land Registry (M16), UK HPI, housemetric. -->
+          <div class="ax-card ax-kpi cr-kpi ax-col--3" role="region" aria-label="Average property value £316,545, up 1.6% vs previous 12 months">
+            <div class="cr-kpi__body">
+              <div class="cr-kpi__head">
+                <span class="ax-kpi__icon ax-kpi__icon--c1">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l-2 0l9 -9l9 9l-2 0"/><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-7"/><path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v6"/></svg>
+                </span>
+                <span class="cr-kpi__label">Average property value</span>
+              </div>
+              <div class="cr-kpi__value ax-num">£316,545</div>
+              <div class="cr-kpi__change">
+                <span class="ax-kpi__delta ax-kpi__delta--up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6 -6l6 6"/></svg>1.6%</span>
+                <span class="cr-kpi__cmp">vs previous 12 months</span>
+              </div>
+              <div class="cr-kpi__spark" data-ax-chart="apex" data-ax-chart-type="area" data-ax-chart-sparkline="true" data-ax-chart-tooltip="false" data-ax-chart-height="48" data-ax-chart-color="--ax-accent" data-ax-chart-series='[{"name":"£K","data":[177,210,196,174,252,267,279,266,294,322]}]' aria-hidden="true"></div>
+            </div>
+          </div>
+
+          <div class="ax-card ax-kpi cr-kpi ax-col--3" role="region" aria-label="Annual growth 1.6%, 0.2 points above the UK average of 1.4%">
+            <div class="cr-kpi__body">
+              <div class="cr-kpi__head">
+                <span class="ax-kpi__icon ax-kpi__icon--c2">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 17l6 -6l4 4l8 -8"/><path d="M14 7l7 0l0 7"/></svg>
+                </span>
+                <span class="cr-kpi__label">Annual growth</span>
+              </div>
+              <div class="cr-kpi__value ax-num">+1.6%</div>
+              <div class="cr-kpi__change">
+                <span class="ax-kpi__delta ax-kpi__delta--up"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6 -6l6 6"/></svg>0.2 pts</span>
+                <span class="cr-kpi__cmp">vs UK avg 1.4%</span>
+              </div>
+              <div class="cr-kpi__spark" data-ax-chart="apex" data-ax-chart-type="area" data-ax-chart-sparkline="true" data-ax-chart-tooltip="false" data-ax-chart-height="48" data-ax-chart-color="--ax-viz-cyan" data-ax-chart-series='[{"name":"Growth %","data":[7.5,19.0,-6.7,-11.5,45.2,5.6,4.6,-4.6,10.5,9.7]}]' aria-hidden="true"></div>
+            </div>
+          </div>
+
+          <!-- Days on market: no source found yet (TBD) — no change chip, no trend line. -->
+          <div class="ax-card ax-kpi cr-kpi ax-col--3" role="region" aria-label="Average days on market: not available yet" data-cr-todo="days-on-market">
+            <div class="cr-kpi__body">
+              <div class="cr-kpi__head">
+                <span class="ax-kpi__icon ax-kpi__icon--c3">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12"/><path d="M16 3v4"/><path d="M8 3v4"/><path d="M4 11h16"/><path d="M8 15h2v2h-2z"/></svg>
+                </span>
+                <span class="cr-kpi__label">Average days on market</span>
+              </div>
+              <div class="cr-kpi__value ax-num">—</div>
+              <div class="cr-kpi__change">
+                <span class="cr-kpi__cmp">No reliable source yet</span>
+              </div>
+              <p class="cr-kpi__src">Awaiting listings data</p>
+            </div>
+          </div>
+
+          <div class="ax-card ax-kpi cr-kpi ax-col--3" role="region" aria-label="Average price per square foot £360, M16 0 sector median">
+            <div class="cr-kpi__body">
+              <div class="cr-kpi__head">
+                <span class="ax-kpi__icon ax-kpi__icon--c4">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 3l4 4l-14 14l-4 -4z"/><path d="M16 7l-1.5 -1.5"/><path d="M13 10l-1.5 -1.5"/><path d="M10 13l-1.5 -1.5"/><path d="M7 16l-1.5 -1.5"/></svg>
+                </span>
+                <span class="cr-kpi__label">Average £ / sq ft</span>
+              </div>
+              <div class="cr-kpi__value ax-num">£360</div>
+              <div class="cr-kpi__change">
+                <span class="cr-kpi__cmp">M16 0 sector median</span>
+              </div>
+              <p class="cr-kpi__src">£3,880 / m² · housemetric</p>
+            </div>
+          </div>
+
+          <!-- ───── PRICE TREND (8) + AREA SCORECARD (4) ─────
+               "All" = M16 yearly average (HM Land Registry). There is no yearly
+               series per property type, so the type filters show a summary. -->
+          <section class="ax-card ax-card--chart ax-col--8" role="region" aria-label="Property value and growth trend"
+            x-data="{
+              type: 'all',
+              types: {
+                detached: { label: 'Detached', avg3: '£481,201', n3: 37,  median: '£608,500', sales: 2,  low: true },
+                semi:     { label: 'Semi',     avg3: '£427,964', n3: 246, median: '£415,000', sales: 55, low: false },
+                flat:     { label: 'Flat',     avg3: '£172,921', n3: 357, median: '£173,250', sales: 62, low: false }
+              },
+              get sel(){ return this.types[this.type]; }
+            }">
+            <div class="ax-card__header">
+              <div class="ax-card__titles">
+                <span class="ax-card__eyebrow">Market</span>
+                <h2 class="ax-card__title">Property Value Trend</h2>
+                <p class="ax-card__subtitle">Average sold price vs. annual growth — M16, 2016–2025</p>
+              </div>
+              <div class="ax-card__actions">
+                <div class="ax-btn-group ax-btn-group--segmented" role="radiogroup" aria-label="Property type">
+                  <button type="button" class="ax-btn ax-btn--sm" role="radio" :class="{ 'is-selected': type==='all' }" :aria-checked="type==='all'" @click="type='all'">All</button>
+                  <button type="button" class="ax-btn ax-btn--sm" role="radio" :class="{ 'is-selected': type==='detached' }" :aria-checked="type==='detached'" @click="type='detached'">Detached</button>
+                  <button type="button" class="ax-btn ax-btn--sm" role="radio" :class="{ 'is-selected': type==='semi' }" :aria-checked="type==='semi'" @click="type='semi'">Semi</button>
+                  <button type="button" class="ax-btn ax-btn--sm" role="radio" :class="{ 'is-selected': type==='flat' }" :aria-checked="type==='flat'" @click="type='flat'">Flat</button>
+                </div>
+              </div>
+            </div>
+            <div class="ax-card__body" style="padding-top:0;">
+              <div x-show="type==='all'">
+                <div class="ax-cluster" style="gap:var(--ax-space-5);margin-block-end:var(--ax-space-3);">
+                  <span class="ax-cluster" style="gap:var(--ax-space-2);"><i style="width:9px;height:9px;border-radius:3px;background:var(--ax-accent);"></i><small style="color:var(--ax-text-muted);font-size:var(--ax-text-sm);">Average value</small></span>
+                  <span class="ax-cluster" style="gap:var(--ax-space-2);"><i style="width:9px;height:9px;border-radius:3px;background:var(--ax-viz-cyan);"></i><small style="color:var(--ax-text-muted);font-size:var(--ax-text-sm);">Annual growth %</small></span>
+                </div>
+                <div id="cr-value-trend" aria-label="Line chart of M16 average sold price from £176,750 in 2016 to £322,464 in 2025, with annual growth columns from -11.5% to +45.2%"></div>
+              </div>
+              <div class="cr-type-sum" x-show="type!=='all'" x-cloak>
+                <div class="cr-type-sum__grid">
+                  <div class="cr-type-sum__stat">
+                    <span class="cr-type-sum__label">Last 3 years average</span>
+                    <b class="cr-type-sum__value ax-num" x-text="sel && sel.avg3"></b>
+                    <small class="cr-type-sum__meta" x-text="sel && `${sel.n3} sales`"></small>
+                  </div>
+                  <div class="cr-type-sum__stat">
+                    <span class="cr-type-sum__label">Last 12 months median</span>
+                    <b class="cr-type-sum__value ax-num" x-text="sel && sel.median"></b>
+                    <small class="cr-type-sum__meta" x-text="sel && `${sel.label} · M16`"></small>
+                  </div>
+                  <div class="cr-type-sum__stat">
+                    <span class="cr-type-sum__label">Sales in 12 months</span>
+                    <b class="cr-type-sum__value ax-num" x-text="sel && sel.sales"></b>
+                    <small class="cr-type-sum__meta">
+                      <span class="ax-badge ax-badge--soft ax-badge--warning ax-badge--sm" x-show="sel && sel.low">Low confidence</span>
+                      <span x-show="sel && !sel.low">to 31 Mar 2026</span>
+                    </small>
+                  </div>
+                </div>
+                <p class="cr-type-sum__hint">No yearly series is published per property type, so a summary is shown instead of the chart.</p>
+              </div>
+              <p class="cr-card-note">Raw average; may fluctuate with property mix. Source: HM Land Registry.</p>
+            </div>
+          </section>
+
+          <section class="ax-card ax-col--4" role="region" aria-label="Area scorecard, indicative overall score 74 out of 100">
+            <div class="ax-card__header">
+              <div class="ax-card__titles">
+                <span class="ax-card__eyebrow">Neighbourhood</span>
+                <h2 class="ax-card__title">Area Scorecard</h2>
+                <p class="ax-card__subtitle"><span class="ax-badge ax-badge--soft ax-badge--neutral ax-badge--pill ax-badge--sm">Indicative</span></p>
+              </div>
+              <span class="ax-badge ax-badge--soft ax-badge--success ax-badge--pill"><span class="ax-badge__dot"></span>74 / 100</span>
+            </div>
+            <div class="ax-card__body" style="padding-top:0;">
+              <div id="cr-score-radar" aria-label="Radar chart of indicative area scores: safety 55, schools 80, transport 88, air quality 50, flood safety 85, ground stability 85"></div>
+              <p style="font-size:var(--ax-text-sm);color:var(--ax-text-muted);margin:0;">Derived from the data on this page, not an official score. Higher is better on every axis.</p>
+            </div>
+          </section>
+
+          <!-- ───── RATINGS ROW: crime · schools · transport ───── -->
+          <!-- Crime rating — GMP publishes no street-level data on police.uk, so the
+               category rates stay TBD; only the ONS borough figure is verified. -->
+          <section class="ax-card ax-col--4" role="region" aria-label="Crime rating: Trafford violent crime 27 per 1,000, below average" data-cr-todo="crime-categories">
+            <div class="ax-card__header">
+              <div class="ax-card__titles">
+                <h2 class="ax-card__title">Crime Rating</h2>
+                <p class="ax-card__subtitle">Trafford borough · year to Sep 2025</p>
+              </div>
+              <span class="ax-badge ax-badge--soft ax-badge--success ax-badge--pill">Below average</span>
+            </div>
+            <div class="ax-card__body" style="padding-top:0;">
+              <div class="ax-cluster" style="justify-content:space-between;align-items:flex-end;margin-bottom:var(--ax-space-4);">
+                <div>
+                  <div class="ax-num" style="font-family:var(--ax-font-display);font-size:var(--ax-text-3xl);font-weight:700;line-height:1;color:var(--ax-text-strong);">27</div>
+                  <small style="color:var(--ax-text-muted);font-size:var(--ax-text-sm);">violent crimes / 1,000 · Manchester 52</small>
+                </div>
+                <span class="ax-badge ax-badge--soft ax-badge--neutral ax-badge--pill ax-badge--sm">ONS</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:var(--ax-space-3);">
+                <div>
+                  <div class="ax-cluster" style="justify-content:space-between;margin-bottom:5px;"><span style="font-size:var(--ax-text-sm);color:var(--ax-text);">Anti-social behaviour</span><b class="ax-num" style="color:var(--ax-text-subtle);font-size:var(--ax-text-sm);">—</b></div>
+                  <div class="ax-progress ax-progress--sm"><div class="ax-progress__track"><div class="ax-progress__fill" style="width:0%;background:var(--ax-viz-violet);"></div></div></div>
+                </div>
+                <div>
+                  <div class="ax-cluster" style="justify-content:space-between;margin-bottom:5px;"><span style="font-size:var(--ax-text-sm);color:var(--ax-text);">Violence &amp; sexual offences</span><b class="ax-num" style="color:var(--ax-text-subtle);font-size:var(--ax-text-sm);">—</b></div>
+                  <div class="ax-progress ax-progress--sm"><div class="ax-progress__track"><div class="ax-progress__fill" style="width:0%;background:var(--ax-viz-violet);"></div></div></div>
+                </div>
+                <div>
+                  <div class="ax-cluster" style="justify-content:space-between;margin-bottom:5px;"><span style="font-size:var(--ax-text-sm);color:var(--ax-text);">Burglary</span><b class="ax-num" style="color:var(--ax-text-subtle);font-size:var(--ax-text-sm);">—</b></div>
+                  <div class="ax-progress ax-progress--sm"><div class="ax-progress__track"><div class="ax-progress__fill" style="width:0%;background:var(--ax-viz-violet);"></div></div></div>
+                </div>
+                <div>
+                  <div class="ax-cluster" style="justify-content:space-between;margin-bottom:5px;"><span style="font-size:var(--ax-text-sm);color:var(--ax-text);">Vehicle crime</span><b class="ax-num" style="color:var(--ax-text-subtle);font-size:var(--ax-text-sm);">—</b></div>
+                  <div class="ax-progress ax-progress--sm"><div class="ax-progress__track"><div class="ax-progress__fill" style="width:0%;background:var(--ax-viz-violet);"></div></div></div>
+                </div>
+              </div>
+              <p class="cr-card-note">Neighbourhood category rates aren't published for Greater Manchester yet.</p>
+            </div>
+          </section>
+
+          <!-- School rating — badge 8.0 = mean of Outstanding (10) / Good (7.5), OTCA excluded. -->
+          <section class="ax-card ax-col--4" role="region" aria-label="School rating 8.0 out of 10">
+            <div class="ax-card__header">
+              <div class="ax-card__titles">
+                <h2 class="ax-card__title">School Rating</h2>
+                <p class="ax-card__subtitle">Nearest schools · Ofsted</p>
+              </div>
+              <span class="ax-badge ax-badge--soft ax-badge--success ax-badge--pill">8.0 / 10</span>
+            </div>
+            <div class="ax-card__body" style="padding-top:0;">
+              <ul class="ax-list ax-list--compact">
+                <li class="ax-list__row" style="padding-inline:0;">
+                  <span class="ax-list__content"><span class="ax-list__title">Seymour Park Community Primary</span><span class="ax-list__meta">Primary · ≈1.0 mi · Dec 2023</span></span>
+                  <span class="ax-list__trailing"><span class="ax-badge ax-badge--soft ax-badge--success ax-badge--sm">Outstanding</span></span>
+                </li>
+                <li class="ax-list__row" style="padding-inline:0;" data-cr-todo="otca-ofsted">
+                  <span class="ax-list__content"><span class="ax-list__title">Old Trafford Community Academy</span><span class="ax-list__meta">Primary · ≈1.1 mi · Oct 2024</span></span>
+                  <span class="ax-list__trailing"><span class="ax-badge ax-badge--soft ax-badge--neutral ax-badge--sm">No grade</span></span>
+                </li>
+                <li class="ax-list__row" style="padding-inline:0;">
+                  <span class="ax-list__content"><span class="ax-list__title">Stretford High School</span><span class="ax-list__meta">Secondary · ≈0.9 mi · Dec 2019</span></span>
+                  <span class="ax-list__trailing"><span class="ax-badge ax-badge--soft ax-badge--info ax-badge--sm">Good</span></span>
+                </li>
+                <li class="ax-list__row" style="padding-inline:0;">
+                  <span class="ax-list__content"><span class="ax-list__title">Stretford Grammar School</span><span class="ax-list__meta">Secondary · Grammar · ≈1.2 mi</span></span>
+                  <span class="ax-list__trailing"><span class="ax-badge ax-badge--soft ax-badge--info ax-badge--sm">Good</span></span>
+                </li>
+                <li class="ax-list__row" style="padding-inline:0;border-bottom:0;">
+                  <span class="ax-list__content"><span class="ax-list__title">Trinity CofE High School</span><span class="ax-list__meta">Secondary · 11–19 · ≈1.8 mi · Nov 2023</span></span>
+                  <span class="ax-list__trailing"><span class="ax-badge ax-badge--soft ax-badge--info ax-badge--sm">Good</span></span>
+                </li>
+              </ul>
+              <p class="cr-card-note">Inspections since Sep 2024 no longer give a one-word overall grade.</p>
+            </div>
+          </section>
+
+          <!-- Transport score (derived) -->
+          <section class="ax-card ax-col--4" role="region" aria-label="Transport score 88 out of 100" data-cr-todo="bus-stops">
+            <div class="ax-card__header">
+              <div class="ax-card__titles">
+                <h2 class="ax-card__title">Transport Score</h2>
+                <p class="ax-card__subtitle">Metrolink, bus &amp; road connectivity</p>
+              </div>
+            </div>
+            <div class="ax-card__body" style="padding-top:0;">
+              <div class="ax-gauge">
+                <div class="ax-gauge__chart" id="cr-transport-gauge" aria-label="Radial gauge: transport score 88 out of 100"></div>
+                <div class="ax-gauge__rows">
+                  <div class="ax-gauge__row">
+                    <span class="ax-gauge__row-label">Old Trafford Metrolink · 0.5 mi</span>
+                    <span class="ax-gauge__row-value ax-num">≈10 min walk</span>
+                  </div>
+                  <div class="ax-gauge__row">
+                    <span class="ax-gauge__row-label">St Peter's Square (city centre)</span>
+                    <span class="ax-gauge__row-value ax-num">≈10 min tram</span>
+                  </div>
+                  <div class="ax-gauge__row">
+                    <span class="ax-gauge__row-label">Bus stops within 400 m</span>
+                    <span class="ax-gauge__row-value ax-num">—</span>
+                  </div>
+                  <div class="ax-gauge__row">
+                    <span class="ax-gauge__row-label">M60 J7 (Stretford)</span>
+                    <span class="ax-gauge__row-value ax-num">≈2.3 mi</span>
+                  </div>
+                </div>
+              </div>
+              <p class="cr-card-note">Altrincham line, trams every 6–12 min; Trafford Bar stop is also nearby. Manchester United Football Ground station opens on matchdays only.</p>
+            </div>
+          </section>
+
+          <!-- ───── ENVIRONMENTAL RISK ROW: flood · mining · air quality ───── -->
+          <!-- Flood risk -->
+          <section class="ax-card ax-col--4" role="region" aria-label="Flood risk: low" data-cr-todo="reservoirs">
+            <div class="ax-card__header">
+              <div class="ax-card__titles">
+                <h2 class="ax-card__title">Flood Risk</h2>
+                <p class="ax-card__subtitle">Environment Agency long-term risk</p>
+              </div>
+              <span class="ax-badge ax-badge--soft ax-badge--success ax-badge--pill"><span class="ax-badge__dot"></span>Low</span>
+            </div>
+            <div class="ax-card__body" style="padding-top:0;">
+              <ul class="ax-list ax-list--compact">
+                <li class="ax-list__row" style="padding-inline:0;">
+                  <span class="ax-list__content"><span class="ax-list__title">Rivers &amp; sea</span><span class="ax-list__meta">Mostly outside EA risk areas</span></span>
+                  <span class="ax-list__trailing"><span class="ax-badge ax-badge--soft ax-badge--success ax-badge--sm">Very low</span></span>
+                </li>
+                <li class="ax-list__row" style="padding-inline:0;">
+                  <span class="ax-list__content"><span class="ax-list__title">Surface water</span><span class="ax-list__meta">Varies by street; check property</span></span>
+                  <span class="ax-list__trailing"><span class="ax-badge ax-badge--soft ax-badge--success ax-badge--sm">Low</span></span>
+                </li>
+                <li class="ax-list__row" style="padding-inline:0;">
+                  <span class="ax-list__content"><span class="ax-list__title">Groundwater</span><span class="ax-list__meta">Unlikely in this area</span></span>
+                  <span class="ax-list__trailing"><span class="ax-badge ax-badge--soft ax-badge--success ax-badge--sm">Low</span></span>
+                </li>
+                <li class="ax-list__row" style="padding-inline:0;border-bottom:0;">
+                  <span class="ax-list__content"><span class="ax-list__title">Reservoirs</span><span class="ax-list__meta">Verify on the EA map</span></span>
+                  <span class="ax-list__trailing" style="color:var(--ax-text-subtle);">—</span>
+                </li>
+              </ul>
+              <p class="cr-card-note">Manchester Ship Canal is nearby; canal flooding is modelled in the Manchester–Salford–Trafford SFRA.</p>
+            </div>
+          </section>
+
+          <!-- Mining risk -->
+          <section class="ax-card ax-col--4" role="region" aria-label="Mining risk: low, to be verified" data-cr-todo="coal-authority">
+            <div class="ax-card__header">
+              <div class="ax-card__titles">
+                <h2 class="ax-card__title">Mining Risk</h2>
+                <p class="ax-card__subtitle">Coal Authority &amp; ground stability</p>
+              </div>
+              <span class="ax-badge ax-badge--soft ax-badge--success ax-badge--pill"><span class="ax-badge__dot"></span>Low</span>
+            </div>
+            <div class="ax-card__body" style="padding-top:0;">
+              <div class="ax-alert ax-alert--info ax-alert--inline" role="status" style="margin-bottom:var(--ax-space-4);">
+                <span class="ax-alert__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/><path d="M12 9h.01"/><path d="M11 12h1v4h1"/></svg></span>
+                <div class="ax-alert__content"><p class="ax-alert__message">Check the Coal Authority map before purchase. Radon potential is the lowest class.</p></div>
+              </div>
+              <ul class="ax-list ax-list--compact">
+                <li class="ax-list__row" style="padding-inline:0;">
+                  <span class="ax-list__content"><span class="ax-list__title">Coal mining reporting area</span></span>
+                  <span class="ax-list__trailing" style="color:var(--ax-text-subtle);">—</span>
+                </li>
+                <li class="ax-list__row" style="padding-inline:0;">
+                  <span class="ax-list__content"><span class="ax-list__title">Recorded mine entries (1 km)</span></span>
+                  <span class="ax-list__trailing ax-num" style="color:var(--ax-text-subtle);">—</span>
+                </li>
+                <li class="ax-list__row" style="padding-inline:0;">
+                  <span class="ax-list__content"><span class="ax-list__title">Radon</span><span class="ax-list__meta">&lt;1% of homes above action level</span></span>
+                  <span class="ax-list__trailing"><span class="ax-badge ax-badge--soft ax-badge--success ax-badge--sm">Class 1 of 6</span></span>
+                </li>
+                <li class="ax-list__row" style="padding-inline:0;border-bottom:0;">
+                  <span class="ax-list__content"><span class="ax-list__title">Natural ground subsidence</span></span>
+                  <span class="ax-list__trailing"><span class="ax-badge ax-badge--soft ax-badge--success ax-badge--sm">Low</span></span>
+                </li>
+              </ul>
+            </div>
+          </section>
+
+          <!-- Air quality — annual roadside NO₂ (A56 AQMA); PM2.5 / NO₂ / PM10 bars are
+               filled live from Open-Meteo by area-radar.js (badge flips to "Live"). -->
+          <section class="ax-card ax-col--4" role="region" aria-label="Air quality: roadside NO2 annual mean about 30 micrograms per cubic metre, legal limit 40" data-cr-air>
+            <div class="ax-card__header">
+              <div class="ax-card__titles">
+                <h2 class="ax-card__title">Air Quality</h2>
+                <p class="ax-card__subtitle">A56 Chester Road AQMA</p>
+              </div>
+              <span class="ax-badge ax-badge--soft ax-badge--neutral ax-badge--pill" data-cr-air-badge><span class="ax-badge__dot"></span><span data-cr-air-badge-text>Annual</span></span>
+            </div>
+            <div class="ax-card__body" style="padding-top:0;">
+              <div class="ax-cluster" style="justify-content:space-between;align-items:flex-end;margin-bottom:var(--ax-space-4);">
+                <div>
+                  <div class="ax-num" style="font-family:var(--ax-font-display);font-size:var(--ax-text-3xl);font-weight:700;line-height:1;color:var(--ax-text-strong);">~30 <small style="font-size:var(--ax-text-base);color:var(--ax-text-muted);font-weight:var(--ax-weight-medium);">µg/m³</small></div>
+                  <small style="color:var(--ax-text-muted);font-size:var(--ax-text-sm);">Roadside NO₂ annual mean · limit 40</small>
+                </div>
+                <span class="ax-badge ax-badge--soft ax-badge--warning ax-badge--pill ax-badge--sm">AQMA</span>
+              </div>
+              <p class="cr-air__head">Now <span data-cr-air-time></span></p>
+              <div style="display:flex;flex-direction:column;gap:var(--ax-space-3);">
+                <div>
+                  <div class="ax-cluster" style="justify-content:space-between;margin-bottom:5px;"><span style="font-size:var(--ax-text-sm);color:var(--ax-text);">PM2.5</span><b class="ax-num" style="color:var(--ax-text-strong);font-size:var(--ax-text-sm);" data-cr-air-val="pm2_5">—</b></div>
+                  <div class="ax-progress ax-progress--sm"><div class="ax-progress__track"><div class="ax-progress__fill" style="width:0%;background:var(--ax-viz-emerald);" data-cr-air-bar="pm2_5"></div></div></div>
+                </div>
+                <div>
+                  <div class="ax-cluster" style="justify-content:space-between;margin-bottom:5px;"><span style="font-size:var(--ax-text-sm);color:var(--ax-text);">NO₂</span><b class="ax-num" style="color:var(--ax-text-strong);font-size:var(--ax-text-sm);" data-cr-air-val="nitrogen_dioxide">—</b></div>
+                  <div class="ax-progress ax-progress--sm"><div class="ax-progress__track"><div class="ax-progress__fill" style="width:0%;background:var(--ax-viz-amber);" data-cr-air-bar="nitrogen_dioxide"></div></div></div>
+                </div>
+                <div>
+                  <div class="ax-cluster" style="justify-content:space-between;margin-bottom:5px;"><span style="font-size:var(--ax-text-sm);color:var(--ax-text);">PM10</span><b class="ax-num" style="color:var(--ax-text-strong);font-size:var(--ax-text-sm);" data-cr-air-val="pm10">—</b></div>
+                  <div class="ax-progress ax-progress--sm"><div class="ax-progress__track"><div class="ax-progress__fill" style="width:0%;background:var(--ax-viz-emerald);" data-cr-air-bar="pm10"></div></div></div>
+                </div>
+              </div>
+              <p class="cr-card-note">A Clean Air GM tube by the stadium (CAP_TRAF_021) missed its 2022 target.</p>
+            </div>
+          </section>
+
+          <!-- ───── PLANNING ROW: developments (8) + conservation (4) ───── -->
+          <section class="ax-card ax-col--8" role="region" aria-label="Major developments in the area">
+            <div class="ax-card__header">
+              <div class="ax-card__titles">
+                <span class="ax-card__eyebrow">Planning</span>
+                <h2 class="ax-card__title">Major Developments in the Area</h2>
+                <p class="ax-card__subtitle">Schemes within 2 miles</p>
+              </div>
+              <a class="ax-btn ax-btn--link" href="https://www.trafford.gov.uk/planning-and-building-control/planning-and-building-control.aspx" target="_blank" rel="noopener">View all</a>
+            </div>
+            <div class="ax-table-wrap">
+              <table class="ax-table ax-table--hover">
+                <thead class="ax-table__head">
+                  <tr>
+                    <th class="ax-table__th" scope="col">Scheme</th>
+                    <th class="ax-table__th" scope="col">Type</th>
+                    <th class="ax-table__th ax-table__th--num" scope="col">Units</th>
+                    <th class="ax-table__th ax-table__th--num" scope="col">Distance</th>
+                    <th class="ax-table__th" scope="col">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr class="ax-table__row">
+                    <td class="ax-table__td"><div style="font-weight:var(--ax-weight-medium);color:var(--ax-text-strong);">New Manchester United Stadium (100,000 seats)</div><div style="font-size:var(--ax-text-xs);color:var(--ax-text-subtle);">Land secured Jun 2026</div></td>
+                    <td class="ax-table__td" style="color:var(--ax-text-muted);">Stadium</td>
+                    <td class="ax-table__td ax-table__td--num" style="color:var(--ax-text-subtle);">—</td>
+                    <td class="ax-table__td ax-table__td--num" style="color:var(--ax-text-muted);">≈0.2 mi</td>
+                    <td class="ax-table__td"><span class="ax-badge ax-badge--soft ax-badge--warning ax-badge--sm">Consultation</span></td>
+                  </tr>
+                  <tr class="ax-table__row">
+                    <td class="ax-table__td"><div style="font-weight:var(--ax-weight-medium);color:var(--ax-text-strong);">Old Trafford Regeneration (OTR MDC)</div><div style="font-size:var(--ax-text-xs);color:var(--ax-text-subtle);">370-acre district · Chair Lord Coe</div></td>
+                    <td class="ax-table__td" style="color:var(--ax-text-muted);">Mixed use</td>
+                    <td class="ax-table__td ax-table__td--num">~15,000</td>
+                    <td class="ax-table__td ax-table__td--num" style="color:var(--ax-text-muted);">0 mi</td>
+                    <td class="ax-table__td"><span class="ax-badge ax-badge--soft ax-badge--info ax-badge--sm">MDC launched Jan 2026</span></td>
+                  </tr>
+                  <tr class="ax-table__row">
+                    <td class="ax-table__td"><div style="font-weight:var(--ax-weight-medium);color:var(--ax-text-strong);">Trafford Wharfside Masterplan</div><div style="font-size:var(--ax-text-xs);color:var(--ax-text-subtle);">Published Jul 2026</div></td>
+                    <td class="ax-table__td" style="color:var(--ax-text-muted);">Mixed use</td>
+                    <td class="ax-table__td ax-table__td--num" style="color:var(--ax-text-subtle);">—</td>
+                    <td class="ax-table__td ax-table__td--num" style="color:var(--ax-text-muted);">≈0.3 mi</td>
+                    <td class="ax-table__td"><span class="ax-badge ax-badge--soft ax-badge--info ax-badge--sm">Published</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <!-- Conservation area status -->
+          <section class="ax-card ax-col--4" role="region" aria-label="Conservation area status: outside a conservation area" data-cr-todo="tree-preservation-orders">
+            <div class="ax-card__header">
+              <div class="ax-card__titles">
+                <h2 class="ax-card__title">Conservation Area Status</h2>
+                <p class="ax-card__subtitle">Heritage &amp; planning constraints</p>
+              </div>
+            </div>
+            <div class="ax-card__body" style="padding-top:0;">
+              <div class="ax-alert ax-alert--info" role="status" style="margin-bottom:var(--ax-space-4);">
+                <span class="ax-alert__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21l18 0"/><path d="M3 10l18 0"/><path d="M5 6l7 -3l7 3"/><path d="M4 10l0 11"/><path d="M20 10l0 11"/><path d="M8 14l0 3"/><path d="M12 14l0 3"/><path d="M16 14l0 3"/></svg></span>
+                <div class="ax-alert__content">
+                  <p class="ax-alert__title">Outside a conservation area</p>
+                  <p class="ax-alert__message">Nearest: Empress Conservation Area (Chester Rd / Empress St) and Longford Conservation Area (Longford Park).</p>
+                </div>
+              </div>
+              <ul class="ax-list ax-list--compact">
+                <li class="ax-list__row" style="padding-inline:0;">
+                  <span class="ax-list__content"><span class="ax-list__title">Empress CA designated</span></span>
+                  <span class="ax-list__trailing ax-num" style="color:var(--ax-text-strong);">1996</span>
+                </li>
+                <li class="ax-list__row" style="padding-inline:0;">
+                  <span class="ax-list__content"><span class="ax-list__title">Longford CA designated</span></span>
+                  <span class="ax-list__trailing ax-num" style="color:var(--ax-text-strong);">25 Sep 1996</span>
+                </li>
+                <li class="ax-list__row" style="padding-inline:0;">
+                  <span class="ax-list__content"><span class="ax-list__title">Article 4 direction (Longford)</span></span>
+                  <span class="ax-list__trailing"><span class="ax-badge ax-badge--soft ax-badge--success ax-badge--sm">No</span></span>
+                </li>
+                <li class="ax-list__row" style="padding-inline:0;">
+                  <span class="ax-list__content"><span class="ax-list__title">Listed buildings nearby</span><span class="ax-list__meta">Trafford Town Hall</span></span>
+                  <span class="ax-list__trailing"><span class="ax-badge ax-badge--soft ax-badge--neutral ax-badge--sm">Grade II</span></span>
+                </li>
+                <li class="ax-list__row" style="padding-inline:0;">
+                  <span class="ax-list__content"><span class="ax-list__title">Tree preservation orders</span></span>
+                  <span class="ax-list__trailing" style="color:var(--ax-text-subtle);">—</span>
+                </li>
+                <li class="ax-list__row" style="padding-inline:0;border-bottom:0;">
+                  <span class="ax-list__content"><span class="ax-list__title">Green Belt</span></span>
+                  <span class="ax-list__trailing"><span class="ax-badge ax-badge--soft ax-badge--success ax-badge--sm">No</span></span>
+                </li>
+              </ul>
+            </div>
+          </section>
+
+          <!-- ───── LOCAL NEWSPAPER ───── -->
+          <section class="ax-card ax-col--12" role="region" aria-label="Local newspaper">
+            <div class="ax-card__header">
+              <div class="ax-card__titles">
+                <span class="ax-card__eyebrow">Local press</span>
+                <h2 class="ax-card__title">Local Newspaper</h2>
+                <p class="ax-card__subtitle">Latest Old Trafford headlines</p>
+              </div>
+              <a class="ax-btn ax-btn--link" href="https://footballgroundguide.com/news/old-trafford-redevelopment-updates" target="_blank" rel="noopener">More stories</a>
+            </div>
+            <div class="ax-card__body" style="padding-top:0;">
+              <div class="cr-news">
+                <article class="cr-news__item">
+                  <a class="cr-news__media" href="https://footballgroundguide.com/news/old-trafford-redevelopment-updates" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true">
+                    <img src="/images/news/planning.jpg" alt="" loading="lazy">
+                    <span class="cr-news__source">Football Ground Guide</span>
+                  </a>
+                  <div class="cr-news__body">
+                    <div class="cr-news__tags">
+                      <span class="ax-badge ax-badge--soft ax-badge--accent ax-badge--sm">Planning</span>
+                      <span class="cr-news__time">13 Sep 2026</span>
+                    </div>
+                    <h3 class="cr-news__title"><a href="https://footballgroundguide.com/news/old-trafford-redevelopment-updates" target="_blank" rel="noopener">Lord Coe admits new stadium timescale is "uncertain"</a></h3>
+                    <p class="cr-news__excerpt">MDC chair says scoping and land acquisition are ongoing; no opening date named.</p>
+                    <div class="cr-news__foot">
+                      <span>footballgroundguide.com</span>
+                      <a class="cr-news__more" href="https://footballgroundguide.com/news/old-trafford-redevelopment-updates" target="_blank" rel="noopener" aria-label="Read: Lord Coe admits new stadium timescale is uncertain">Read
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l14 0"/><path d="M13 18l6 -6"/><path d="M13 6l6 6"/></svg>
+                      </a>
+                    </div>
+                  </div>
+                </article>
+                <article class="cr-news__item">
+                  <a class="cr-news__media" href="https://footballgroundguide.com/news/old-trafford-redevelopment-updates" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true">
+                    <img src="/images/news/transport.jpg" alt="" loading="lazy">
+                    <span class="cr-news__source">Football Ground Guide</span>
+                  </a>
+                  <div class="cr-news__body">
+                    <div class="cr-news__tags">
+                      <span class="ax-badge ax-badge--soft ax-badge--accent ax-badge--sm">Planning</span>
+                      <span class="cr-news__time">Sep 2026</span>
+                    </div>
+                    <h3 class="cr-news__title"><a href="https://footballgroundguide.com/news/old-trafford-redevelopment-updates" target="_blank" rel="noopener">Stadium's 90 m trident needs Manchester Airport sign-off</a></h3>
+                    <p class="cr-news__excerpt">The design feature sits in a flight-path zone, requiring airport permission.</p>
+                    <div class="cr-news__foot">
+                      <span>footballgroundguide.com</span>
+                      <a class="cr-news__more" href="https://footballgroundguide.com/news/old-trafford-redevelopment-updates" target="_blank" rel="noopener" aria-label="Read: Stadium's 90 m trident needs Manchester Airport sign-off">Read
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l14 0"/><path d="M13 18l6 -6"/><path d="M13 6l6 6"/></svg>
+                      </a>
+                    </div>
+                  </div>
+                </article>
+                <article class="cr-news__item">
+                  <a class="cr-news__media" href="https://www.chartmill.com/news/external/51469/bizwire-2026-6-22-manchester-united-secures-land-for-new-100000-seat-stadium" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true">
+                    <img src="/images/news/schools.jpg" alt="" loading="lazy">
+                    <span class="cr-news__source">Business Wire</span>
+                  </a>
+                  <div class="cr-news__body">
+                    <div class="cr-news__tags">
+                      <span class="ax-badge ax-badge--soft ax-badge--info ax-badge--sm">Regeneration</span>
+                      <span class="cr-news__time">22 Jun 2026</span>
+                    </div>
+                    <h3 class="cr-news__title"><a href="https://www.chartmill.com/news/external/51469/bizwire-2026-6-22-manchester-united-secures-land-for-new-100000-seat-stadium" target="_blank" rel="noopener">Manchester United secures land for 100,000-seat stadium</a></h3>
+                    <p class="cr-news__excerpt">Club confirms site; regeneration aims for ~15,000 homes and 48,000 local jobs.</p>
+                    <div class="cr-news__foot">
+                      <span>businesswire.com</span>
+                      <a class="cr-news__more" href="https://www.chartmill.com/news/external/51469/bizwire-2026-6-22-manchester-united-secures-land-for-new-100000-seat-stadium" target="_blank" rel="noopener" aria-label="Read: Manchester United secures land for 100,000-seat stadium">Read
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l14 0"/><path d="M13 18l6 -6"/><path d="M13 6l6 6"/></svg>
+                      </a>
+                    </div>
+                  </div>
+                </article>
+                <article class="cr-news__item">
+                  <a class="cr-news__media" href="https://www.mancity.com/news/mens/manchester-derby-old-trafford-stats-september-2026-63925064" target="_blank" rel="noopener" tabindex="-1" aria-hidden="true">
+                    <img src="/images/news/environment.jpg" alt="" loading="lazy">
+                    <span class="cr-news__source">Man City</span>
+                  </a>
+                  <div class="cr-news__body">
+                    <div class="cr-news__tags">
+                      <span class="ax-badge ax-badge--soft ax-badge--success ax-badge--sm">Sport</span>
+                      <span class="cr-news__time">13 Sep 2026</span>
+                    </div>
+                    <h3 class="cr-news__title"><a href="https://www.mancity.com/news/mens/manchester-derby-old-trafford-stats-september-2026-63925064" target="_blank" rel="noopener">City win Manchester derby 1–0 at Old Trafford</a></h3>
+                    <p class="cr-news__excerpt">Crowd of 74,161 — the season's highest Premier League attendance so far.</p>
+                    <div class="cr-news__foot">
+                      <span>mancity.com</span>
+                      <a class="cr-news__more" href="https://www.mancity.com/news/mens/manchester-derby-old-trafford-stats-september-2026-63925064" target="_blank" rel="noopener" aria-label="Read: City win Manchester derby 1–0 at Old Trafford">Read
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l14 0"/><path d="M13 18l6 -6"/><path d="M13 6l6 6"/></svg>
+                      </a>
+                    </div>
+                  </div>
+                </article>
+              </div>
+            </div>
+          </section>
+
+        </div>
+      </main>
+      <footer class="ax-footer">
+        <div class="ax-footer__left">
+          <span class="ax-footer__copy">© 2026 Corelain Dashboard</span>
+          <span class="ax-footer__sep" aria-hidden="true">·</span>
+          <span class="ax-footer__version ax-mono">v1.0.0</span>
+        </div>
+      </footer>
+    </div>
+  </div>
+  <!-- Toasts for page actions (shared $store.toasts queue) -->
+  <div class="ax-toast-region ax-toast-region--bottom-end" x-data aria-live="polite" aria-atomic="false">
+    <template x-for="t in $store.toasts.items" :key="t.id">
+      <div class="ax-toast" :class="'ax-toast--' + (t.tone || 'info')" role="status" x-transition.opacity.duration.200ms>
+        <svg class="ax-toast__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 18 0a9 9 0 1 0 -18 0"/><path d="M9 12l2 2l4 -4"/></svg>
+        <div class="ax-toast__content">
+          <p class="ax-toast__title" x-text="t.title || 'Done'"></p>
+          <p class="ax-toast__message" x-text="t.msg" x-show="t.msg"></p>
+        </div>
+        <button type="button" class="ax-toast__dismiss" @click="$store.toasts.dismiss(t.id)" aria-label="Dismiss notification">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6l-12 12"/><path d="M6 6l12 12"/></svg>
+        </button>
+      </div>
+    </template>
+  </div>
+  <!--
+    Vireo — COMMAND PALETTE  ·  #ax-command
+    ────────────────────────────────────────────────────────────────────────────
+    The panel behind the header's ⌘K search trigger, and behind its 38px icon
+    twin on phones. Opened by:
+      · the .ax-search button in partials/header.html / partials/app-bar.html,
+        which raises `ax-command-open`,
+      · ⌘K / Ctrl-K anywhere on the page,
+      · any element carrying [data-ax-command-open].
+  
+    Everything below the input is EMITTED BY js/core/command-palette.js into
+    .ax-command__results — it fuzzy-searches the same nav manifest the sidebar
+    filter uses, groups the hits (Dashboards / Apps / Pages / Actions) and drives
+    ↑↓/↵/esc. This file is only the shell it fills; the module toggles `.is-open`
+    plus the `hidden` attribute on the root, so the resting state here is hidden.
+    Body scroll-lock and the focus trap are the module's job too.
+  
+    Placed at BODY level (next to the customizer), never inside .ax-header — the
+    header's `backdrop-filter` makes it a containing block for fixed descendants,
+    which would pin this overlay inside the bar.
+  -->
+  <div id="ax-command" class="ax-command" role="dialog" aria-modal="true" aria-labelledby="ax-command-title" aria-hidden="true" hidden>
+  
+    <!-- Click-catch scrim, painted behind the panel. -->
+    <button type="button" class="ax-command__backdrop" data-ax-command-backdrop aria-label="Close search" tabindex="-1"></button>
+  
+    <div class="ax-command__panel">
+      <h2 id="ax-command-title" class="ax-visually-hidden">Search or jump to</h2>
+  
+      <!-- ===== QUERY ROW ===== -->
+      <div class="ax-command__input">
+        <svg class="ax-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" /><path d="M21 21l-6 -6" /></svg>
+        <input type="text" data-ax-command-input placeholder="Search areas and postcodes…" aria-label="Search areas and postcodes" aria-controls="ax-command-results" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
+        <kbd class="ax-command__keycap ax-command__keycap--esc">esc</kbd>
+        <button type="button" class="ax-icon-btn ax-command__close" data-ax-command-close aria-label="Close search">
+          <svg class="ax-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" aria-hidden="true"><path d="M18 6l-12 12" /><path d="M6 6l12 12" /></svg>
+        </button>
+      </div>
+  
+      <!-- ===== RESULTS (filled by command-palette.js) ===== -->
+      <div id="ax-command-results" class="ax-command__results" data-ax-command-results role="listbox" aria-label="Search results"></div>
+  
+      <!-- ===== KEY HINTS (pointer/keyboard only — hidden on phones) ===== -->
+      <div class="ax-command__foot" aria-hidden="true">
+        <span class="ax-command__hint"><kbd class="ax-command__keycap">↑</kbd><kbd class="ax-command__keycap">↓</kbd>navigate</span>
+        <span class="ax-command__hint"><kbd class="ax-command__keycap">↵</kbd>open</span>
+        <span class="ax-command__hint"><kbd class="ax-command__keycap">esc</kbd>close</span>
+      </div>
+    </div>
+  </div>
+  <!-- ============================================================ -->
+  <!-- VIREO RUNTIME — single ES module entry.                      -->
+  <!-- Boots Alpine + plugins, registers shell components           -->
+  <!-- (axShell, axSidebar, axHeader, axDropdown, axCommand,        -->
+  <!-- axCustomizer), fetches /src/data/nav-manifest.json, and      -->
+  <!-- wires active-trail, breadcrumb, command palette, theme.      -->
+  <!-- ============================================================ -->
+  
+  <!-- Per-page hook (optional):
+       Pages that need extra behavior (charts, datatables, editors) add a
+       deferred module AFTER this line, e.g.:
+       <script type="module" src="/src/js/pages/dashboards-sales.js"></script>
+       Keep page scripts deferred/module so they run after vireo.js boots. -->
+</body>
+</html>
